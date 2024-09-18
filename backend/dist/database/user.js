@@ -45,7 +45,6 @@ const userSchema = new mongoose_1.Schema({
     image: { type: String },
     emailVerified: { type: Date },
 });
-// Hash the password before saving the user
 userSchema.pre('save', function (next) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!this.isModified('password'))
@@ -55,12 +54,10 @@ userSchema.pre('save', function (next) {
         next();
     });
 });
-// Method to compare password during login
 userSchema.methods.comparePassword = function (password) {
     return __awaiter(this, void 0, void 0, function* () {
         return yield bcrypt_1.default.compare(password, this.password);
     });
 };
-// Create and export the User model
 const User = mongoose_1.default.model('User', userSchema);
 exports.default = User;
