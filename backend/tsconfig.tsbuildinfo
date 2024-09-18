@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/database/config.ts","./src/database/task.ts","./src/routes/task.ts"],"version":"5.6.2"}
+{"root":["./src/index.ts","./src/database/config.ts","./src/database/task.ts","./src/database/user.ts","./src/routes/task.ts","./src/routes/user.ts"],"version":"5.6.2"}
