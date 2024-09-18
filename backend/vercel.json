@@ -1,0 +1,27 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "backend/src/index.ts",
+        "use": "@vercel/node",
+        "config": {
+          "includeFiles": [
+            "backend/src/**/*.ts",
+            "backend/src/**/*.json"
+          ]
+        }
+      }
+    ],
+    "routes": [
+      {
+        "src": "/api/(.*)",
+        "dest": "/backend/src/index.ts"
+      }
+    ],
+    "env": {
+      "NODE_ENV": "production",
+      "DATABASE_URL": "mongodb+srv://j:jainam@cluster0.h5mn9fs.mongodb.net/task-management-dashboard ",
+      "JWT_SECRET": "jainam"
+    }
+  }
+  
