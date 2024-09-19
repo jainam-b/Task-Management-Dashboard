@@ -45,7 +45,7 @@ router.post("/tasks", async (req, res) => {
 
 
 // route to edit task 
-router.put("/task/:id", async (req, res) => {
+router.put("/tasks/:id", async (req, res) => {
     const { title, description, status, priority, dueDate } = req.body;
     const taskId = req.params.id;  
   
@@ -93,7 +93,7 @@ router.put("/task/:id", async (req, res) => {
 
 
 // route to delete task
-router.delete("/task/:id", async (req, res) => {
+router.delete("/tasks/:id", async (req, res) => {
     const taskId = req.params.id;
   
     try {
