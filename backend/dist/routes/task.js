@@ -51,7 +51,7 @@ router.post("/tasks", (req, res) => __awaiter(void 0, void 0, void 0, function* 
     });
 }));
 // route to edit task 
-router.put("/task/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.put("/tasks/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { title, description, status, priority, dueDate } = req.body;
     const taskId = req.params.id;
     // Validate inputs
@@ -87,7 +87,7 @@ router.put("/task/:id", (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 }));
 // route to delete task
-router.delete("/task/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.delete("/tasks/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const taskId = req.params.id;
     try {
         const deletedTask = yield task_1.default.findByIdAndDelete(taskId);

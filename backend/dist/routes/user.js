@@ -25,7 +25,8 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
         const hashedPassword = yield bcrypt_1.default.hash(password, 10);
         const user = new user_1.default({ name, email, password: hashedPassword });
         yield user.save();
-        res.status(201).json({ message: 'User registered successfully' });
+        const token = jsonwebtoken_1.default.sign({ userId: user._id }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
+        res.status(201).json({ message: 'User registered successfully', token });
     }
     catch (err) {
         res.status(500).json({ error: err.message });
