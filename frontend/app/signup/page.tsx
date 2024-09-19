@@ -1,7 +1,6 @@
 "use client"
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import axios from 'axios'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +10,7 @@ import Link from 'next/link'
 
 export default function SignInPage() {
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const router = useRouter()
@@ -20,21 +20,29 @@ export default function SignInPage() {
     setError('')
 
     try {
-      // Make a POST request using Axios
-      const response = await axios.post('https://task-management-dashboard-jainam.vercel.app/api/login', {
-        email,
-        password,
+      const response = await fetch('https://task-management-dashboard-jainam.vercel.app/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name:username,
+          email,
+          password,
+        }),
       })
-      const { token } = response.data
-      localStorage.setItem('token', token)
-      router.push('/')
 
-    } catch (err: any) {
-      if (err.response && err.response.data) {
-        setError(err.response.data.message || 'Login failed')
-      } else {
-        setError('An error occurred. Please try again.')
+      if (!response.ok) {
+        const errorData = await response.json()
+        setError(errorData.message || 'Login failed')
+        return
       }
+
+      // If login is successful, redirect to another page
+      router.push('/') 
+
+    } catch (err) {
+      setError('An error occurred. Please try again.')
       console.error('Login error:', err)
     }
   }
@@ -43,17 +51,28 @@ export default function SignInPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <Card className="w-[350px]">
         <CardHeader>
-          <CardTitle>Sign In</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
+          <CardTitle>Sign Up</CardTitle>
+          <CardDescription>Enter your credentials to register your account</CardDescription>
         </CardHeader>
         {error && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive" className="mt-4">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         <form onSubmit={handleSubmit}>
           <CardContent>
             <div className="grid w-full items-center gap-4">
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="email">Username</Label>
+                <Input 
+                  id="username" 
+                  type="text" 
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input 
@@ -79,18 +98,18 @@ export default function SignInPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col">
-            <Button className="w-full" type="submit">Sign In</Button>
-            {/* Redirect to Sign Up if the user doesn't have an account */}
+            <Button className="w-full" type="submit">Sign Up</Button>
             <div className="mt-4 text-center">
               <p className="text-sm">
-                Don't have an account?{' '}
-                <Link href="/signup" className="underline text-blue-600">
-                  Sign Up
+                Already have an account?{' '}
+                <Link href="/signin" className="underline text-blue-600">
+                  Sign In
                 </Link>
               </p>
             </div>
           </CardFooter>
         </form>
+       
       </Card>
     </div>
   )

@@ -1,10 +1,14 @@
-import Image from "next/image";
+import Todo from '@/components/Todo'
+import Navbar from '@/components/ui/NavBar'
+import React from 'react'
 
-export default function Home() {
-  console.log(process.env.NEXTAUTH_SECRET)
+const page = () => {
   return (
     <div>
-      Hello world
+     <Navbar/> 
+     <Todo/>
     </div>
-  );
+  )
 }
+
+export default page
