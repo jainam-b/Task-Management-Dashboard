@@ -1,69 +1,89 @@
-// todo component
 "use client"
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getTodos, addTodo, removeTodo, updateTodos, toggleTodo } from '../store/todoSlice';
-import { RootState } from '@/store/store';
-import { X, Edit, Plus } from 'lucide-react';
+import { getTodos, addTodo, removeTodo, updateTodos, toggleTodo, Todo as TodoType } from '../store/todoSlice';
+import { RootState, AppDispatch } from '@/store/store';
+import { X, Edit, Plus, Loader2, Calendar, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button'; 
-import { CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from '@/components/ui/checkbox';
-
 import TodoDialog from '@/components/TodoModal';
-import { createTodo, deleteTodo } from '@/app/api/task';
+
+const Spinner: React.FC = () => (
+  <div className="flex justify-center items-center h-40">
+    <Loader2 className="h-8 w-8 animate-spin text-red-500" />
+  </div>
+);
+
+const EmptyState: React.FC = () => (
+  <div className="text-center py-10">
+    <h3 className="mt-2 text-sm font-semibold text-gray-900">No tasks</h3>
+    <p className="mt-1 text-sm text-gray-500">Get started by creating a new task</p>
+  </div>
+);
+
+const PriorityFlag: React.FC<{ priority: number }> = ({ priority }) => {
+  // Ensure priority is within the range of available colors
+  const colors = ['text-gray-400', 'text-blue-500', 'text-orange-500', 'text-red-500'];
+  
+  // Use a fallback if priority exceeds the defined range (e.g., default to 0)
+  const colorClass = colors[priority] || colors[0];
+
+  return <Flag className={`h-4 w-4 ${colorClass}`} />;
+};
+
 
 const Todo: React.FC = () => {
-  const dispatch = useDispatch();
-  const todos = useSelector((state: RootState) => state.todos.todos);
+  const dispatch = useDispatch<AppDispatch>();
+  const todos = useSelector((state: RootState) => Object.values(state.todos.entities));
   const status = useSelector((state: RootState) => state.todos.status);
   const [isDialogOpen, setDialogOpen] = useState(false);
-  const [todoToEdit, setTodoToEdit] = useState<Todo | null>(null);
-  console.log("______",todos);
+  const [todoToEdit, setTodoToEdit] = useState<TodoType | null>(null);
   
   const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    weekday: 'long', day: 'numeric', month: 'long'
   });
 
   useEffect(() => {
     dispatch(getTodos());
   }, [dispatch]);
 
-  const handleAddTodo = async (todo: Omit<Todo, 'id'>) => {
+  const handleAddTodo = async (todo: Omit<TodoType, 'id' | '_id'>) => {
     try {
-      // Create the todo via API
-      await createTodo(todo);
-      
-      // Refetch todos or update local state
-      const updatedTodos = await fetchTodos(); // Fetch updated todos
-      dispatch(setTodos(updatedTodos)); // Update the Redux state with new todos
-      
-      setDialogOpen(false); // Close the modal after adding the task
+      await dispatch(addTodo(todo)).unwrap();
+      setDialogOpen(false);
+      location.reload();
     } catch (error) {
       console.error("Failed to add todo:", error);
     }
   };
-  
 
-  const handleEditTodo = (todo: Todo) => {
+  const handleEditTodo = (todo: TodoType) => {
     setTodoToEdit(todo);
     setDialogOpen(true);
   };
 
   const handleRemoveTodo = async (id: string) => {
     try {
-      // Await the deleteTodo API call to ensure the todo is removed on the server
-      await deleteTodo(id);
-      dispatch(removeTodo(id));
+      await dispatch(removeTodo(id)).unwrap();
     } catch (error) {
       console.error('Failed to delete todo:', error);
     }
   };
 
-  const handleToggleTodo = (id: string) => {
-    dispatch(toggleTodo(id));
+  const handleToggleTodo = async (todo: TodoType) => {
+    if (todo.completed) {
+      try {
+        await dispatch(removeTodo(todo._id)).unwrap();
+      } catch (error) {
+        console.error('Failed to delete todo:', error);
+      }
+    } else {
+      dispatch(toggleTodo(todo)); // Toggle the completion state if not completed yet
+    }
   };
 
-  const handleSave = (todo: Omit<Todo, 'id'>) => {
+  const handleSave = (todo: Omit<TodoType, 'id' | '_id'>) => {
     if (todoToEdit) {
       dispatch(updateTodos({ ...todoToEdit, ...todo }));
       setTodoToEdit(null);
@@ -75,48 +95,61 @@ const Todo: React.FC = () => {
 
   const renderTodoList = () => {
     if (status === 'loading') {
-      return <div>Loading...</div>;
+      return <Spinner />;
     }
 
-    if (!Array.isArray(todos) || todos.length === 0) {
-      return <div>No todos yet. Add a new one to get started!</div>;
+    if (todos.length === 0) {
+      return <EmptyState />;
     }
 
     return (
-      <ul className="space-y-4">
+      <ul className="space-y-1">
         {todos.map((todo) => (
-          <li key={todo._id} className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition">
-            <div className="flex items-center space-x-4">
+          <li key={todo._id} className="flex items-center justify-between py-2 px-4 hover:bg-gray-50 rounded-lg transition">
+            <div className="flex items-center space-x-3 flex-grow">
               <Checkbox
                 checked={todo.completed}
-                onCheckedChange={() => handleToggleTodo(todo._id)}
-                id={`todo-${todo.id}`}
+                onCheckedChange={() => handleToggleTodo(todo)}
+                id={`todo-${todo._id}`}
+                className="rounded-full"
               />
-              <label
-                htmlFor={`todo-${todo.id}`}
-                className={`text-lg ${todo.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}
-              >
-                {todo.title}
-              </label>
+              <div className="flex flex-col">
+                <label
+                  htmlFor={`todo-${todo._id}`}
+                  className={`text-sm ${todo.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}
+                >
+                  {todo.title}
+                </label>
+                {todo.description && (
+                  <span className="text-xs text-gray-500">{todo.description}</span>
+                )}
+              </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex items-center space-x-2">
+              {todo.dueDate && (
+                <span className="text-xs text-gray-500 flex items-center">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {new Date(todo.dueDate).toLocaleDateString()}
+                </span>
+              )}
+              {/* <PriorityFlag priority={todo.priority} /> */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => handleRemoveTodo(todo._id)}
-                className="text-red-500 hover:text-red-700 transition"
+                className="text-gray-400 hover:text-red-500 transition"
                 aria-label="Delete Todo"
               >
-                <X size={18} />
+                <X size={16} />
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
                 onClick={() => handleEditTodo(todo)}
-                className="text-blue-500 hover:text-blue-700 transition"
+                className="text-gray-400 hover:text-blue-500 transition"
                 aria-label="Edit Todo"
               >
-                <Edit size={18} />
+                <Edit size={16} />
               </Button>
             </div>
           </li>
@@ -126,24 +159,22 @@ const Todo: React.FC = () => {
   };
 
   return (
-    <>
-      <div className="w-full max-w-lg mx-auto mt-10 rounded-lg">
-        <CardHeader>
-          <div className="text-center text-gray-600 mt-2">
-            <h2 className="text-xl font-semibold">Today</h2>
-            <p className="text-lg">{today}</p>
-          </div>
-        </CardHeader>
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <Button onClick={() => setDialogOpen(true)} className="bg-blue-500 text-white hover:bg-blue-600 transition flex items-center space-x-2">
+    <div className="container mx-auto px-4 py-8 bg-gray-50 min-h-screen">
+      <Card className="w-full max-w-3xl mx-auto shadow-lg">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Today</h2>
+              <p className="text-sm text-gray-500">{today}</p>
+            </div>
+            <Button onClick={() => setDialogOpen(true)} className="bg-red-500 text-white hover:bg-red-600 transition flex items-center space-x-2">
               <Plus size={16} />
               <span>Add Task</span>
             </Button>
           </div>
           {renderTodoList()}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
       <TodoDialog
         isOpen={isDialogOpen}
         onClose={() => {
@@ -153,7 +184,7 @@ const Todo: React.FC = () => {
         onSave={handleSave}
         todoToEdit={todoToEdit}
       />
-    </>
+    </div>
   );
 };
 

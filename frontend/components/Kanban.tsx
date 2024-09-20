@@ -1,124 +1,138 @@
-"use client"
-import React, { useEffect, useState } from 'react';
+"use client";
+import React, { useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useDrag, useDrop, DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { fetchTodos, updateTodoStatus } from '@/app/api/task';
-
-interface Todo {
-  _id: any;
-  id: string;
-  title: string;
-  description?: string;
-  status: string;
-  priority: string;
-  dueDate?: string;
-  completed: boolean;
-}
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { getTodos, updateTodos, toggleTodo, Todo, TodoStatus, TodoPriority } from '../store/todoSlice';
+import { AppDispatch, RootState } from '../store/store';
 
 // Column component
-const Column = ({ status, children }: any) => {
+const Column: React.FC<{ status: TodoStatus; onDrop: (item: any, status: TodoStatus) => void }> = ({ status, onDrop, children }) => {
   const [, drop] = useDrop({
     accept: 'CARD',
-    drop: (item: any) => {
-      item.moveTask(item.id, status);
-    },
+    drop: (item: any) => onDrop(item, status),
   });
 
   return (
     <div
       ref={drop}
-      className="bg-gray-200 rounded-lg shadow-md p-4 w-80"
+      className="bg-gray-100 rounded-lg p-4 w-80 min-h-[300px] border border-gray-200 transition duration-200 ease-in-out"
     >
-      <h2 className="text-xl font-bold mb-4">{status}</h2>
-      {children}
+      <h2 className="text-xl font-semibold mb-4 text-gray-800">{status}</h2>
+      <div className="space-y-3">{children}</div>
     </div>
   );
 };
 
 // Task component
-const Task = ({ todo, moveTask, onOpenDialog }: { todo: Todo; moveTask: any; onOpenDialog: (todo: Todo) => void }) => {
+const Task: React.FC<{ 
+  todo: Todo; 
+  onOpenDialog: (todo: Todo) => void;
+  onToggle: (todo: Todo) => void;
+}> = ({ todo, onOpenDialog, onToggle }) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'CARD',
-    item: { id: todo._id, moveTask }, // Updated to match the ID field in your data
+    item: { id: todo._id, originalStatus: todo.status },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   });
 
+  const getPriorityColor = (priority: TodoPriority) => {
+    switch (priority) {
+      case TodoPriority.High:
+        return 'bg-red-500';
+      case TodoPriority.Medium:
+        return 'bg-yellow-500';
+      case TodoPriority.Low:
+        return 'bg-green-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
   return (
     <div
       ref={drag}
-      className="bg-white p-4 rounded-lg shadow-md mb-2 cursor-pointer"
-      style={{ opacity: isDragging ? 0.5 : 1 }}
-      onClick={() => onOpenDialog(todo)}
+      className={`bg-white p-4 rounded-lg shadow-sm border-l-4 ${getPriorityColor(todo.priority)} hover:shadow-md transition duration-200 ease-in-out ${
+        isDragging ? 'opacity-50' : 'opacity-100'
+      }`}
     >
-      {todo.title}
+      <div className="flex items-center justify-between">
+        <h3 
+          className="text-md font-medium text-gray-900 cursor-pointer"
+          onClick={() => onOpenDialog(todo)}
+        >
+          {todo.title}
+        </h3>
+        <input
+          type="checkbox"
+          checked={todo.completed}
+          onChange={() => onToggle(todo)}
+          className="form-checkbox h-5 w-5 text-blue-600"
+        />
+      </div>
+      {todo.description && <p className="text-sm text-gray-500 mt-1">{todo.description}</p>}
+      {todo.dueDate && (
+        <p className="text-xs text-gray-400 mt-2">
+          Due: {new Date(todo.dueDate).toLocaleDateString()}
+        </p>
+      )}
     </div>
   );
 };
 
 // Main Kanban board component
-const Kanban = () => {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [selectedTask, setSelectedTask] = useState<Todo | null>(null);
+const Kanban: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const todos = useSelector((state: RootState) => Object.values(state.todos.entities));
+  const [selectedTask, setSelectedTask] = React.useState<Todo | null>(null);
 
-  // Fetch todos on mount
   useEffect(() => {
-    const loadTodos = async () => {
-      try {
-        const data = await fetchTodos();
-        setTodos(data);
-      } catch (error) {
-        console.error('Failed to fetch todos:', error);
-      }
-    };
-    loadTodos();
+    dispatch(getTodos());
+  }, [dispatch]);
+
+  const handleDrop = useCallback((item: { id: string, originalStatus: TodoStatus }, newStatus: TodoStatus) => {
+    const todoToMove = todos.find((todo) => todo._id === item.id);
+    if (!todoToMove || todoToMove.status === newStatus) return;
+  
+    // Optimistic update
+    const optimisticUpdatedTodo = { ...todoToMove, status: newStatus };
+    dispatch({ type: 'todos/updateLocal', payload: optimisticUpdatedTodo });
+  
+    // Proceed with actual async update
+    dispatch(updateTodos(optimisticUpdatedTodo));
+  }, [dispatch, todos]);
+  
+
+  const handleToggle = useCallback((todo: Todo) => {
+    dispatch(toggleTodo(todo));
+  }, [dispatch]);
+
+  const handleOpenDialog = useCallback((todo: Todo) => {
+    setSelectedTask(todo);
   }, []);
 
-  // Move task between statuses
-  const moveTask = async (id: string, newStatus: string) => {
-    // Update local state
-    const updatedTodos = todos.map((todo) =>
-      todo._id === id ? { ...todo, status: newStatus } : todo
-    );
-    setTodos(updatedTodos);
-
-    // Update the status in the backend
-    try {
-      await updateTodoStatus(id, newStatus);
-    } catch (error) {
-      console.error('Failed to update todo status:', error);
-      // Optionally, revert local state if the backend update fails
-      setTodos(todos); // Revert to the original state
-    }
-  };
-
-  const handleOpenDialog = (todo: Todo) => {
-    setSelectedTask(todo);
-  };
-
-  const handleCloseDialog = () => {
+  const handleCloseDialog = useCallback(() => {
     setSelectedTask(null);
-  };
+  }, []);
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex space-x-4 p-4 overflow-x-auto">
-        {['To Do', 'In Progress', 'Done'].map((status) => (
-          <Column status={status} key={status}>
+      <div className="flex space-x-4 p-4 overflow-x-auto bg-gray-50 min-h-screen">
+        {Object.values(TodoStatus).map((status) => (
+          <Column status={status} key={status} onDrop={handleDrop}>
             {todos
               .filter((todo) => todo.status === status)
               .map((todo) => (
-                <Task key={todo._id} todo={todo} moveTask={moveTask} onOpenDialog={handleOpenDialog} />
+                <Task 
+                  key={todo._id} 
+                  todo={todo} 
+                  onOpenDialog={handleOpenDialog}
+                  onToggle={handleToggle}
+                />
               ))}
           </Column>
         ))}
@@ -126,18 +140,24 @@ const Kanban = () => {
 
       {selectedTask && (
         <AlertDialog open={!!selectedTask} onOpenChange={handleCloseDialog}>
-          <AlertDialogContent>
+          <AlertDialogContent className="bg-white shadow-lg rounded-lg p-6">
             <AlertDialogHeader>
-              <AlertDialogTitle>{selectedTask.title}</AlertDialogTitle>
-              <AlertDialogDescription>
-                <p>Status: {selectedTask.status}</p>
-                <p>Description: {selectedTask.description || 'No description'}</p>
-                {/* Add more details or actions if needed */}
+              <AlertDialogTitle className="text-lg font-bold text-gray-900">{selectedTask.title}</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm text-gray-600 mt-2">
+                <p><strong>Status:</strong> {selectedTask.status}</p>
+                <p><strong>Priority:</strong> {selectedTask.priority}</p>
+                <p className="mt-1"><strong>Description:</strong> {selectedTask.description || 'No description'}</p>
+                {selectedTask.dueDate && (
+                  <p className="mt-1"><strong>Due Date:</strong> {new Date(selectedTask.dueDate).toLocaleDateString()}</p>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleCloseDialog}>Close</AlertDialogCancel>
-              {/* Add more actions if needed */}
+              <AlertDialogCancel asChild>
+                <Button variant="outline" onClick={handleCloseDialog}>
+                  Close
+                </Button>
+              </AlertDialogCancel>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
